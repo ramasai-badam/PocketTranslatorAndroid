@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Pocket Translator</string>
+    <string name="input_hint">Enter text to translate or process...</string>
+    <string name="generate_response">Generate Response</string>
+    <string name="clear">Clear</string>
+    <string name="response_label">Response:</string>
+    <string name="initializing">Initializing LLM...</string>
+    <string name="ready">LLM Ready</string>
+    <string name="error_no_input">Please enter some text</string>
+    <string name="error_llm_not_initialized">LLM not initialized</string>
+</resources>
