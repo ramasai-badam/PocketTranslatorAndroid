@@ -1,0 +1,1 @@
+# PocketTranslatorAndroid
