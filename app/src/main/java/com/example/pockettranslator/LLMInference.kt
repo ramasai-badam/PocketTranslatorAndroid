@@ -3,52 +3,47 @@ package com.example.pockettranslator
 import android.content.Context
 import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class LLMInference {
     
     private var llmInference: LlmInference? = null
     private val TAG = "LLMInference"
     
+    // Change this to match your actual task file name in assets
+    private val MODEL_FILE_NAME = "llm_model.task"
+    
     suspend fun initialize(context: Context) {
         try {
-            // For this example, we'll use a simple text generation approach
-            // In a real app, you would download and use an actual LLM model file
+            Log.d(TAG, "Initializing LLM with task file: $MODEL_FILE_NAME")
             
-            // Create options for LLM inference
+            // Create options for LLM inference using task file from assets
             val options = LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(getModelPath(context))
-                .setMaxTokens(256)
+                .setModelPath(getModelPath())
+                .setMaxTokens(512)
                 .setTemperature(0.8f)
                 .setTopK(40)
                 .setRandomSeed(101)
                 .build()
             
-            llmInference = LlmInference.createFromOptions(context, options)
+            // Initialize LLM inference on IO thread
+            withContext(Dispatchers.IO) {
+                llmInference = LlmInference.createFromOptions(context, options)
+            }
+            
             Log.d(TAG, "LLM initialized successfully")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize LLM", e)
-            throw e
+            Log.e(TAG, "Failed to initialize LLM: ${e.message}", e)
+            throw Exception("Failed to initialize LLM. Make sure '$MODEL_FILE_NAME' exists in assets folder. Error: ${e.message}")
         }
     }
     
-    private fun getModelPath(context: Context): String {
-        // This is a placeholder - in a real app, you would:
-        // 1. Download a compatible LLM model (like Gemma, Phi, etc.)
-        // 2. Place it in assets or download it to internal storage
-        // 3. Return the actual path to the model file
-        
-        // For now, we'll create a dummy path and handle the error gracefully
-        val modelFile = File(context.filesDir, "model.bin")
-        
-        // Create a dummy model file for demonstration
-        if (!modelFile.exists()) {
-            modelFile.createNewFile()
-            modelFile.writeText("dummy_model_content")
-        }
-        
-        return modelFile.absolutePath
+    private fun getModelPath(): String {
+        // Return the path to the task file in assets directory
+        // Make sure to replace "llm_model.task" with your actual task file name
+        return "file:///android_asset/$MODEL_FILE_NAME"
     }
     
     suspend fun generateText(prompt: String): String {
@@ -57,33 +52,36 @@ class LLMInference {
                 throw IllegalStateException("LLM not initialized")
             }
             
-            // Since we don't have a real model, we'll simulate a response
-            // In a real implementation, you would use:
-            // val response = llmInference?.generateResponse(prompt)
-            // return response?.text() ?: "No response"
+            Log.d(TAG, "Generating response for prompt: ${prompt.take(50)}...")
             
-            simulateTextGeneration(prompt)
+            // Use actual MediaPipe LLM inference
+            val response = withContext(Dispatchers.IO) {
+                llmInference?.generateResponse(prompt)
+            }
+            
+            val generatedText = response?.text() ?: "No response generated"
+            Log.d(TAG, "Generated response: ${generatedText.take(100)}...")
+            
+            generatedText
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating text", e)
-            "Error: ${e.message}\n\nNote: This is a demo app. To use real LLM inference, you need to:\n1. Download a compatible model (Gemma, Phi, etc.)\n2. Place it in the app's assets\n3. Update the model path in LLMInference.kt"
-        }
-    }
-    
-    private fun simulateTextGeneration(prompt: String): String {
-        // Simulate different types of responses based on input
-        return when {
-            prompt.contains("translate", ignoreCase = true) -> {
-                "Translation: This is a simulated translation response for: '$prompt'"
-            }
-            prompt.contains("hello", ignoreCase = true) -> {
-                "Hello! I'm a simulated LLM response. How can I help you today?"
-            }
-            prompt.contains("what", ignoreCase = true) -> {
-                "This is a simulated response to your question: '$prompt'. In a real implementation, this would be generated by an actual language model."
-            }
-            else -> {
-                "Simulated LLM Response: I understand you said '$prompt'. This is a demo response. To enable real LLM inference, please add a compatible model file to the app."
+            Log.e(TAG, "Error generating text: ${e.message}", e)
+            
+            // Provide helpful error message
+            when {
+                e.message?.contains("not found") == true || 
+                e.message?.contains("asset") == true -> {
+                    "Error: Model file '$MODEL_FILE_NAME' not found in assets folder.\n\nPlease:\n1. Add your .task file to app/src/main/assets/\n2. Update MODEL_FILE_NAME in LLMInference.kt\n3. Rebuild the app"
+                }
+                e.message?.contains("memory") == true -> {
+                    "Error: Insufficient memory to load the model. Try using a smaller model or closing other apps."
+                }
+                e.message?.contains("format") == true -> {
+                    "Error: Invalid model format. Make sure you're using a compatible MediaPipe LLM task file."
+                }
+                else -> {
+                    "Error generating response: ${e.message}\n\nTroubleshooting:\n1. Verify model file exists in assets\n2. Check model compatibility\n3. Ensure sufficient device memory"
+                }
             }
         }
     }
@@ -96,5 +94,15 @@ class LLMInference {
         } catch (e: Exception) {
             Log.e(TAG, "Error closing LLM inference", e)
         }
+    }
+    
+    // Helper function to check if model is initialized
+    fun isInitialized(): Boolean {
+        return llmInference != null
+    }
+    
+    // Helper function to get model info (for debugging)
+    fun getModelInfo(): String {
+        return "Model: $MODEL_FILE_NAME, Path: ${getModelPath()}, Initialized: ${isInitialized()}"
     }
 }
